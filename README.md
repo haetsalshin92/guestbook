@@ -1,4 +1,4 @@
-# 🧪 Jenkins CI/CD 파이프라인 예제
+# 🧪 Jenkins CI/CD 파이프라인 예제 !!
 
 이 프로젝트는 Jenkins를 사용하여 GitHub 소스코드를 기반으로 **빌드 → 테스트 → SonarQube 분석 → Docker 이미지 생성 및 배포**까지의 파이프라인을 자동화합니다.
 
