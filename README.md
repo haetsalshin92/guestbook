@@ -1,7 +1,12 @@
+# 🧪 Jenkins CI/CD 파이프라인 예제
 
-#1. 젠킨스 파이프 라인
+이 프로젝트는 Jenkins를 사용하여 GitHub 소스코드를 기반으로 **빌드 → 테스트 → SonarQube 분석 → Docker 이미지 생성 및 배포**까지의 파이프라인을 자동화합니다.
 
-'''
+---
+
+## 📌 1. Jenkins Pipeline
+
+```groovy
 import java.text.SimpleDateFormat
 
 def TODAY = (new SimpleDateFormat("yyMMddHHmm")).format(new Date())
@@ -16,7 +21,7 @@ pipeline {
         stage('Checkout'){
             steps{
                 git branch: 'master',
-                url : 'https://github.com/haetsalshin92/guestbook.git'
+                    url : 'https://github.com/haetsalshin92/guestbook.git'
             }
         }
         stage('build'){
@@ -41,8 +46,8 @@ pipeline {
                         ./mvnw sonar:sonar \
                          -Dsonar.projectKey=guestbook \
                          -Dsonar.host.url=http://43.203.33.31:9000 \
-                         -Dsonar.login=<토큰값값>
-                '''
+                         -Dsonar.login=<토큰값>
+                    '''
                 }
             }
         }
@@ -57,7 +62,6 @@ pipeline {
                         } else{
                             echo "OK Status: ${qg.status}"
                         }
-                        
                     }
                 }
             }
@@ -96,38 +100,34 @@ pipeline {
             }
         }
     }
-    post{
-            always {
-                slackSend(tokenCredentialId: 'slack-token'
-                        , channel: '#소셜'
-                        , color : 'good'
-                        , message : "${JOB_NAME} (${BUILD_NUMBER}) 빌드가 끝났습니다. Details : (<${BUILD_URL} | here>)"
-                         )    
-            }
-            success {
-                slackSend(tokenCredentialId: 'slack-token'
-                        , channel: '#소셜'
-                        , color : 'good'
-                        , message : "${JOB_NAME} (${BUILD_NUMBER}) 빌드가 성공적으로 끝났습니다. Details : (<${BUILD_URL} | here>)"
-                         )    
-            }
-            failure {
-                slackSend(tokenCredentialId: 'slack-token'
-                        , channel: '#소셜'
-                        , color : 'danger'
-                        , message : "${JOB_NAME} (${BUILD_NUMBER}) 빌드가 실패하였습니다. Details : (<${BUILD_URL} | here>)"
-                         )    
-            }
+    post {
+        always {
+            slackSend(tokenCredentialId: 'slack-token',
+                      channel: '#소셜',
+                      color: 'good',
+                      message: "${JOB_NAME} (${BUILD_NUMBER}) 빌드가 끝났습니다. Details: (<${BUILD_URL} | here>)")
         }
+        success {
+            slackSend(tokenCredentialId: 'slack-token',
+                      channel: '#소셜',
+                      color: 'good',
+                      message: "${JOB_NAME} (${BUILD_NUMBER}) 빌드가 성공적으로 끝났습니다. Details: (<${BUILD_URL} | here>)")
+        }
+        failure {
+            slackSend(tokenCredentialId: 'slack-token',
+                      channel: '#소셜',
+                      color: 'danger',
+                      message: "${JOB_NAME} (${BUILD_NUMBER}) 빌드가 실패하였습니다. Details: (<${BUILD_URL} | here>)")
+        }
+    }
 }
+```
 
-'''
-
-#2. dockerHub
+## 📌 2. dockerHub
 ![image](https://github.com/user-attachments/assets/2cfa7dcf-ea1b-4e73-9fcf-55ae91cb46d7)
 
-#3. sonarQube
+## 📌 3. sonarQube
 ![image](https://github.com/user-attachments/assets/70c1114a-73f8-4ba1-8cac-101744fce17c)
 
-#4. slack
+## 📌 4. slack
 ![image](https://github.com/user-attachments/assets/62aba5ab-c416-4d93-8dc6-73af46a031c8)
