@@ -131,3 +131,7 @@ pipeline {
 
 ## 📌 4. slack
 ![image](https://github.com/user-attachments/assets/62aba5ab-c416-4d93-8dc6-73af46a031c8)
+
+## 📌 5. webhook
+-> push가 이루어지면 자동으로 jenkins 빌드 시작
+![image](https://github.com/user-attachments/assets/ab9e7219-0801-4790-9fa0-78766631709d)
