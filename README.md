@@ -1,30 +1,132 @@
-✅ 1. ./mvnw는 무엇인가?
-./mvnw는 Maven Wrapper 실행 스크립트예요.
 
-즉, Maven이 젠킨스 서버에 설치되어 있지 않아도, 프로젝트 내에 Maven Wrapper가 있으면 해당 버전의 Maven을 자동으로 내려받아 사용하게 해줘요.
+#1. 젠킨스 파이프 라인
+'''
+import java.text.SimpleDateFormat
 
-Git 프로젝트에 ./mvnw, mvnw.cmd, .mvn/ 폴더가 있으면 Maven Wrapper가 설정된 프로젝트예요.
+def TODAY = (new SimpleDateFormat("yyMMddHHmm")).format(new Date())
 
-✅ 2. clean compile은 무엇을 의미하나?
-clean: target/ 디렉토리를 지워서 이전 빌드 결과를 없앰.
+pipeline {
+    agent any
+    environment {
+        strDockerTag = "${TODAY}_${BUILD_ID}"
+        strDockerImage = "sinsin09022/cicd_guestbook:${strDockerTag}"
+    }
+    stages {
+        stage('Checkout'){
+            steps{
+                git branch: 'master',
+                url : 'https://github.com/haetsalshin92/guestbook.git'
+            }
+        }
+        stage('build'){
+            steps{
+                sh "./mvnw clean package"
+            }
+        }
+        stage('Unit Test'){
+            steps{
+                sh './mvnw test'
+            }
+            post{
+                always{
+                    junit '**/target/surefire-reports/TEST-*.xml'
+                }
+            }
+        }
+        stage('SonarQube Analysis'){
+            steps{
+                withSonarQubeEnv('SonarQube-Server'){
+                    sh '''
+                        ./mvnw sonar:sonar \
+                         -Dsonar.projectKey=guestbook \
+                         -Dsonar.host.url=http://43.203.33.31:9000 \
+                         -Dsonar.login=<토큰값값>
+                '''
+                }
+            }
+        }
+        stage('SonarQube Quality Gate'){
+            steps{
+                timeout(time: 1, unit: 'MINUTES'){
+                    script{
+                        def qg = waitForQualityGate()
+                        if(qg.status != 'OK'){
+                            echo "NOT OK Status: ${qg.status}"
+                            error "Pipeline aborted due to quality gate failure: ${qg.status}"
+                        } else{
+                            echo "OK Status: ${qg.status}"
+                        }
+                        
+                    }
+                }
+            }
+        }
+        stage('Docker image Build'){
+            steps{
+                script{
+                    oDockImage = docker.build(strDockerImage, "--build-arg VERSION=${strDockerTag} -f Dockerfile .")
+                }
+            }
+        }
+        stage('Docker Image Push'){
+            steps{
+                script {
+                    docker.withRegistry('', 'DockerHub_Credential'){
+                        oDockImage.push()
+                    }
+                }
+            }
+        }
+        stage('SSH Staging Server'){
+            steps{
+                sshagent(credentials: ['Staging-PrivateKey']){
+                    sh "ssh -o StrictHostKeyChecking=no root@172.31.0.110 docker container rm -f guestbookapp"
+                    sh "ssh -o StrictHostKeyChecking=no root@172.31.0.110 docker container run \
+                        -d \
+                        -p 38080:80 \
+                        --name=guestbookapp \
+                        -e MYSQL_IP=172.31.0.100 \
+                        -e MYSQL_PORT=3306 \
+                        -e MYSQL_DATABASE=guestbook \
+                        -e MYSQL_USER=root \
+                        -e MYSQL_PASSWORD=education \
+                        ${strDockerImage}"
+                }
+            }
+        }
+    }
+    post{
+            always {
+                slackSend(tokenCredentialId: 'slack-token'
+                        , channel: '#소셜'
+                        , color : 'good'
+                        , message : "${JOB_NAME} (${BUILD_NUMBER}) 빌드가 끝났습니다. Details : (<${BUILD_URL} | here>)"
+                         )    
+            }
+            success {
+                slackSend(tokenCredentialId: 'slack-token'
+                        , channel: '#소셜'
+                        , color : 'good'
+                        , message : "${JOB_NAME} (${BUILD_NUMBER}) 빌드가 성공적으로 끝났습니다. Details : (<${BUILD_URL} | here>)"
+                         )    
+            }
+            failure {
+                slackSend(tokenCredentialId: 'slack-token'
+                        , channel: '#소셜'
+                        , color : 'danger'
+                        , message : "${JOB_NAME} (${BUILD_NUMBER}) 빌드가 실패하였습니다. Details : (<${BUILD_URL} | here>)"
+                         )    
+            }
+        }
+}
 
-compile: src/main/java 안의 소스 파일들을 .class 파일로 컴파일만 함 (JAR로 패키징은 안 함).
+'''
 
-✅ 3. 어디서 실행되고, 뭘 빌드하나?
-Jenkins 기준 흐름:
-git clone → 프로젝트가 워크스페이스에 복사됨 (예: /home/ec2-user/.jenkins/workspace/guestbook)
+#2. dockerHub
+![image](https://github.com/user-attachments/assets/2cfa7dcf-ea1b-4e73-9fcf-55ae91cb46d7)
 
-Jenkins는 이 워크스페이스 디렉토리에서 ./mvnw clean compile 실행
+#3. sonarQube
+![image](https://github.com/user-attachments/assets/70c1114a-73f8-4ba1-8cac-101744fce17c)
 
-해당 디렉토리의 pom.xml 파일을 기준으로 빌드 시작
-
-🔹 즉, ./mvnw는 현재 디렉토리(보통은 checkout 받은 Git 루트)에 있는 pom.xml을 읽고,
-src/main/java의 자바 소스들을 컴파일하여 target/classes에 .class 파일로 변환합니다.
-
-✅ Maven이 없으면 안 되는가?
-./mvnw를 쓰면 Maven이 로컬에 설치되어 있지 않아도 괜찮음
-
-단, mvnw가 프로젝트에 포함되어 있어야 함
-
-만약 ./mvnw가 없다면, 시스템에 Maven이 설치되어 있어야 하고 mvn clean compile처럼 사용해야 해요.
-
+#4. slack
+![image](https://github.com/user-attachments/assets/62aba5ab-c416-4d93-8dc6-73af46a031c8)
